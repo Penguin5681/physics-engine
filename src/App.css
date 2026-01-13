@@ -47,6 +47,68 @@
   width: 100%;
 }
 
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.modal-content .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.roadmap-list {
+  margin-top: 20px;
+}
+
+.roadmap-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+.roadmap-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-top: 5px;
+  cursor: pointer;
+}
+
+.roadmap-item p {
+  margin: 5px 0 0 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
 /* Light Theme */
 .app-container.light {
   background-color: #ffffff;
@@ -59,6 +121,10 @@
 .app-container.light button {
   background-color: #e0e0e0;
   color: #333;
+}
+.modal-content.light {
+  background-color: #ffffff;
+  color: #333333;
 }
 
 /* Dark Theme */
@@ -73,6 +139,14 @@
 .app-container.dark button {
   background-color: #333;
   color: #fff;
+}
+.modal-content.dark {
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  border: 1px solid #333;
+}
+.modal-content.dark .roadmap-item {
+  border-bottom-color: rgba(255,255,255,0.1);
 }
 
 /* Responsive */
