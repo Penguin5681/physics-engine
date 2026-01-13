@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Box, Plane } from "@react-three/drei";
+import { Box, Plane, useTexture, OrbitControls } from "@react-three/drei";
 import { Mesh } from "three";
 import "./App.css";
 
@@ -52,12 +52,14 @@ const Simulation = () => {
     }
   });
 
+  const texture = useTexture('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/crate.gif');
+
   return (
     <>
-      <Box ref={boxRef} args={[1, 1, 1]} position={[0, 10, 0]}>
-        <meshStandardMaterial color="orange" />
+      <Box ref={boxRef} args={[1, 1, 1]} position={[0, 10, 0]} castShadow>
+        <meshStandardMaterial map={texture} />
       </Box>
-      <Plane args={[20, 20]} rotation={[-Math.PI / 2, 0, 0]}>
+      <Plane args={[20, 20]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <meshStandardMaterial color="gray" />
       </Plane>
     </>
@@ -80,19 +82,25 @@ function App() {
     document.body.appendChild(script);
   }, []);
 
-  if (!ready) return <div>Loading Physics Engine...</div>;
+  if (!ready) return <div>loading engine</div>;
 
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
+    <div style={{ width: "80vw", height: "80vh" }}>
       <Canvas shadows camera={{ position: [5, 5, 10], fov: 50 }}>
-        <ambientLight intensity={0.5} />
+        <ambientLight intensity={0.3} />
         <spotLight
           position={[10, 10, 10]}
-          angle={0.15}
-          penumbra={1}
+          angle={0.5}
+          penumbra={0.5}
+          intensity={2}
           castShadow
+          shadow-mapSize={[1024, 1024]}
         />
-        <Simulation />
+        <directionalLight position={[-5, 5, 5]} intensity={0.5} castShadow />
+        <Suspense fallback={null}>
+          <Simulation />
+        </Suspense>
+        <OrbitControls />
       </Canvas>
     </div>
   );

@@ -55,8 +55,9 @@ public:
             particle.position.z += particle.velocity.z * dt;
             
             // NOTE: velocity going less than zero is just floor collision.
-            if (particle.position.y < 0) {
-                particle.position.y = 0;
+            // Assuming the particle represents a cube of height 1, half-height is 0.5
+            if (particle.position.y < 0.5) {
+                particle.position.y = 0.5;
                 particle.velocity.y *= -0.5;
             }
         }
