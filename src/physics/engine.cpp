@@ -37,9 +37,22 @@ public:
 class PhysicsWorld {
     std::vector<Particle> particles;
     float gravity = -9.81;
+    float restitution = 0.5;
 
 public:
     PhysicsWorld() {}
+
+    void setGravity(float g) {
+        gravity = g;
+    }
+
+    void setRestitution(float r) {
+        restitution = r;
+    }
+
+    void reset() {
+        particles.clear();
+    }
 
     void addParticle(float x, float y, float z) {
         particles.push_back(Particle(x, y, z));
@@ -58,7 +71,7 @@ public:
             // Assuming the particle represents a cube of height 1, half-height is 0.5
             if (particle.position.y < 0.5) {
                 particle.position.y = 0.5;
-                particle.velocity.y *= -0.5;
+                particle.velocity.y *= -restitution;
             }
         }
     }
@@ -78,6 +91,9 @@ public:
 EMSCRIPTEN_BINDINGS(applicable_physics_engine) {
     class_<PhysicsWorld>("PhysicsWorld")
         .constructor<>()
+        .function("setGravity", &PhysicsWorld::setGravity)
+        .function("setRestitution", &PhysicsWorld::setRestitution)
+        .function("reset", &PhysicsWorld::reset)
         .function("addParticle", &PhysicsWorld::addParticle)
         .function("step", &PhysicsWorld::step)
         .function("getParticlePosition", &PhysicsWorld::getParticlePosition)
