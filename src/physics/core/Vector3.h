@@ -15,6 +15,10 @@ public:
         z = -z;
     }
 
+    float dot(const Vector3& v) const {
+        return x * v.x + y * v.y + z * v.z;
+    }
+
     float magnitude() const {
         return std::sqrt(x*x + y*y + z*z);
     }

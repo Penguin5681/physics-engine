@@ -1,95 +1,86 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Sphere, Plane, useTexture, OrbitControls } from "@react-three/drei"; // Changed Box to Sphere
-import { Mesh } from "three";
+import { Sphere, Box, Plane, OrbitControls, useTexture, Environment } from "@react-three/drei";
+import * as THREE from "three";
 import "./App.css";
 
-// 1. Update Types to match C++ Phase 2 API
-interface Vector3 {
-  x: number;
-  y: number;
-  z: number;
-}
-
-interface BodyData {
-  pos: Vector3;
-  // We will add 'rot' (quaternion) here later
-}
+// --- Types ---
+interface Vector3 { x: number; y: number; z: number; }
+interface BodyData { pos: Vector3; }
 
 interface PhysicsWorldInstance {
-  // Old: addParticle(x, y, z)
-  // New: addSphere(x, y, z, radius, mass)
   addSphere(x: number, y: number, z: number, radius: number, mass: number): void;
-  
+  addBox(x: number, y: number, z: number, w: number, h: number, d: number, mass: number): void;
   step(dt: number): void;
-  
-  // Old: getParticlePosition
-  // New: getBodyPosition returns nested object { pos: {x,y,z} }
   getBodyPosition(index: number): BodyData | null;
-  
   getBodyCount(): number;
-  
+  setGravity(g: number): void;
+  setRestitution(r: number): void;
+  reset(): void;
   delete(): void;
-  
-  // These are temporarily removed in C++ Phase 2. 
-  // We will re-add them in Phase 4.
-  // setGravity(g: number): void;
-  // setRestitution(r: number): void;
-  // reset(): void;
 }
 
 interface PhysicsModule {
   PhysicsWorld: new () => PhysicsWorldInstance;
 }
 
-interface RoadmapItem {
-  id: number;
-  todo: string;
-  description: string;
-  is_completed: boolean;
-  sequence_number: number;
-  created_at: string;
+declare global {
+  interface Window { createPhysicsModule: () => Promise<PhysicsModule>; }
 }
 
-declare global {
-  interface Window {
-    createPhysicsModule: () => Promise<PhysicsModule>;
-  }
-}
+// Visual Object Definition
+type SimulationObject = 
+  | { id: number; type: 'sphere'; radius: number }
+  | { id: number; type: 'box'; size: [number, number, number] };
 
 let physicsModule: PhysicsModule | null = null;
 
-interface SimulationProps {
-  gravity: number;
-  restitution: number;
-  resetTrigger: number;
+// --- Texture Components ---
+
+const TextureManager = () => {
+    // Preload textures to avoid pop-in
+    useTexture.preload('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/crate.gif');
+    useTexture.preload('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/uv_grid_opengl.jpg');
+    useTexture.preload('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/hardwood2_diffuse.jpg');
+    return null;
 }
 
-const API_BASE_URL = "https://applicable-v1-backend-671108073568.europe-west1.run.app";
-
-const Simulation = ({ gravity, restitution, resetTrigger }: SimulationProps) => {
+// --- The Simulation Component ---
+const PhysicsScene = ({ 
+  objects, 
+  gravity, 
+  restitution, 
+  simulationRunning 
+}: { 
+  objects: SimulationObject[], 
+  gravity: number, 
+  restitution: number,
+  simulationRunning: boolean
+}) => {
   const worldRef = useRef<PhysicsWorldInstance | null>(null);
-  const meshRef = useRef<Mesh>(null);
+  const meshRefs = useRef<(THREE.Mesh | null)[]>([]);
 
+  // Load Textures
+  const crateTexture = useTexture('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/crate.gif');
+  const sphereTexture = useTexture('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/uv_grid_opengl.jpg');
+  const floorTexture = useTexture('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/hardwood2_diffuse.jpg');
+
+  // Configure textures
+  floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+  floorTexture.repeat.set(10, 10);
+
+  // 1. Initialize Physics World
   useEffect(() => {
     if (physicsModule && !worldRef.current) {
-      const world = new physicsModule.PhysicsWorld();
-      // Add a Sphere: x=0, y=10, z=0, radius=0.5, mass=1.0
-      world.addSphere(0, 10, 0, 0.5, 1.0);
-      worldRef.current = world;
+      worldRef.current = new physicsModule.PhysicsWorld();
     }
-
-    // Cleanup when component unmounts
     return () => {
-        if (worldRef.current) {
-            worldRef.current.delete();
-            worldRef.current = null;
-        }
-    }
+      worldRef.current?.delete();
+      worldRef.current = null;
+    };
   }, []);
 
-  /* TODO: Re-enable these in Phase 4 when we add setters back to C++
-     
+  // 2. Sync Props
   useEffect(() => {
     if (worldRef.current) {
       worldRef.current.setGravity(gravity);
@@ -97,105 +88,89 @@ const Simulation = ({ gravity, restitution, resetTrigger }: SimulationProps) => 
     }
   }, [gravity, restitution]);
 
+  // 3. Sync Objects
   useEffect(() => {
-    if (worldRef.current && resetTrigger > 0) {
-      worldRef.current.reset();
-      worldRef.current.addSphere(0, 10, 0, 0.5, 1.0);
+    if (!worldRef.current) return;
+    
+    const world = worldRef.current;
+    const currentCount = world.getBodyCount();
+    
+    if (objects.length === 0 && currentCount > 0) {
+        world.reset();
+        return;
     }
-  }, [resetTrigger]);
-  */
 
+    for (let i = currentCount; i < objects.length; i++) {
+      const obj = objects[i];
+      const startX = (Math.random() - 0.5) * 5;
+      const startZ = (Math.random() - 0.5) * 5;
+      const startY = 8 + (i * 1.5); 
+
+      if (obj.type === 'sphere') {
+        world.addSphere(startX, startY, startZ, obj.radius, 1.0);
+      } else if (obj.type === 'box') {
+        world.addBox(startX, startY, startZ, obj.size[0], obj.size[1], obj.size[2], 1.0);
+      }
+    }
+  }, [objects]);
+
+  // 4. Loop
   useFrame((_, delta) => {
-    if (worldRef.current && meshRef.current) {
-      worldRef.current.step(Math.min(delta, 0.1));
+    if (!worldRef.current || !simulationRunning) return;
 
-      // New Data Structure: { pos: {x, y, z} }
-      const data = worldRef.current.getBodyPosition(0);
-      if (data) {
-        meshRef.current.position.set(data.pos.x, data.pos.y, data.pos.z);
+    worldRef.current.step(Math.min(delta, 0.1));
+
+    for (let i = 0; i < objects.length; i++) {
+      const bodyData = worldRef.current.getBodyPosition(i);
+      const mesh = meshRefs.current[i];
+      
+      if (bodyData && mesh) {
+        mesh.position.set(bodyData.pos.x, bodyData.pos.y, bodyData.pos.z);
       }
     }
   });
 
-  // Use a different texture or color for the sphere
-  const texture = useTexture('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/crate.gif');
-
   return (
     <>
-      {/* Changed Box to Sphere to match Physics */}
-      <Sphere ref={meshRef} args={[0.5, 32, 32]} position={[0, 10, 0]} castShadow>
-        <meshStandardMaterial map={texture} />
-      </Sphere>
+      <TextureManager />
+      {objects.map((obj, i) => (
+        obj.type === 'sphere' ? (
+          <Sphere 
+            key={obj.id} 
+            ref={(el) => (meshRefs.current[i] = el)} 
+            args={[obj.radius, 32, 32]} 
+            castShadow
+          >
+            <meshStandardMaterial map={sphereTexture} roughness={0.1} metalness={0.2} />
+          </Sphere>
+        ) : (
+          <Box 
+            key={obj.id} 
+            ref={(el) => (meshRefs.current[i] = el)} 
+            args={obj.size} 
+            castShadow
+          >
+            <meshStandardMaterial map={crateTexture} />
+          </Box>
+        )
+      ))}
       
-      <Plane args={[20, 20]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <meshStandardMaterial color="gray" />
+      {/* Floor with Wood Texture */}
+      <Plane args={[50, 50]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <meshStandardMaterial map={floorTexture} roughness={0.8} />
       </Plane>
     </>
   );
 };
 
+// --- Main App Component ---
 function App() {
   const [ready, setReady] = useState(false);
+  const [objects, setObjects] = useState<SimulationObject[]>([]);
   
-  // Controls state (Temporarily visual only until Phase 4)
   const [gravity, setGravity] = useState(-9.81);
-  const [restitution, setRestitution] = useState(0.5);
-  const [resetTrigger, setResetTrigger] = useState(0);
-  
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-
-  // Lighting State
-  const [ambientIntensity, setAmbientIntensity] = useState(0.3);
-  const [spotIntensity, setSpotIntensity] = useState(2);
-  const [spotAngle, setSpotAngle] = useState(0.5);
-  const [spotPenumbra, setSpotPenumbra] = useState(0.5);
-  const [spotPos, setSpotPos] = useState<[number, number, number]>([10, 10, 10]);
-  const [dirIntensity, setDirIntensity] = useState(0.5);
-  const [dirPos, setDirPos] = useState<[number, number, number]>([-5, 5, 5]);
-  const [castShadows, setCastShadows] = useState(true);
-
-  const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
-  const [roadmapItems, setRoadmapItems] = useState<RoadmapItem[]>([]);
-
-  useEffect(() => {
-    if (isRoadmapOpen) {
-      fetch(`${API_BASE_URL}/api/roadmap`)
-        .then((res) => res.json())
-        .then((data) => setRoadmapItems(data.sort((a: RoadmapItem, b: RoadmapItem) => a.sequence_number - b.sequence_number)))
-        .catch((err) => console.error("Failed to fetch roadmap", err));
-    }
-  }, [isRoadmapOpen]);
-
-  const toggleRoadmapItem = (id: number, currentStatus: boolean) => {
-    const newStatus = !currentStatus;
-    setRoadmapItems((items) =>
-      items.map((item) => (item.id === id ? { ...item, is_completed: newStatus } : item))
-    );
-
-    fetch(`${API_BASE_URL}/api/roadmap/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_completed: newStatus }),
-    }).catch((err) => {
-      console.error("Failed to update status", err);
-      setRoadmapItems((items) =>
-        items.map((item) => (item.id === id ? { ...item, is_completed: currentStatus } : item))
-      );
-    });
-  };
-
-  const resetControls = () => {
-    setGravity(-9.81);
-    setRestitution(0.5);
-    setAmbientIntensity(0.3);
-    setSpotIntensity(2);
-    setSpotAngle(0.5);
-    setSpotPenumbra(0.5);
-    setSpotPos([10, 10, 10]);
-    setDirIntensity(0.5);
-    setDirPos([-5, 5, 5]);
-    setCastShadows(true);
-  };
+  const [restitution, setRestitution] = useState(0.7);
+  const [isRunning, setIsRunning] = useState(true);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -210,147 +185,80 @@ function App() {
     document.body.appendChild(script);
   }, []);
 
-  if (!ready) return <div style={{ padding: "20px" }}>Loading Physics Engine...</div>;
+  const spawnSphere = () => {
+    setObjects(prev => [...prev, { id: Date.now(), type: 'sphere', radius: 0.5 + Math.random()*0.3 }]);
+  };
+
+  const spawnBox = () => {
+    setObjects(prev => [...prev, { id: Date.now(), type: 'box', size: [1, 1, 1] }]);
+  };
+
+  const clearAll = () => setObjects([]);
+
+  if (!ready) return <div className="loading">Initializing Engine...</div>;
 
   return (
-    <div className={`app-container ${theme}`}>
+    <div className="app-container">
       <div className="sidebar">
-        <h3>Controls</h3>
+        <h3>Physics Engine</h3>
         
-        <div className="control-group">
-          <label>Theme</label>
-          <button onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}>
-            Switch to {theme === "light" ? "Dark" : "Light"} Mode
-          </button>
-        </div>
-
-        <button onClick={resetControls} style={{ padding: "10px", cursor: "pointer", marginTop: "10px", width: "100%", marginBottom: "10px" }}>
-          Reset Controls
-        </button>
-
-        <h4>Physics</h4>
-        <div style={{fontSize: '0.8rem', color: '#888', marginBottom: '10px'}}>
-            *Controls paused during architecture upgrade
-        </div>
-        <div className="control-group disabled">
-          <label>Gravity: {gravity}</label>
-          <input disabled type="range" min="-20" max="0" step="0.1" value={gravity} onChange={(e) => setGravity(parseFloat(e.target.value))} />
-        </div>
-        <div className="control-group disabled">
-          <label>Bounciness: {restitution}</label>
-          <input disabled type="range" min="0" max="2" step="0.1" value={restitution} onChange={(e) => setRestitution(parseFloat(e.target.value))} />
-        </div>
-        <button disabled onClick={() => setResetTrigger((n) => n + 1)} style={{ padding: "10px", marginTop: "10px", width: "100%", opacity: 0.5 }}>
-          Reset Box
-        </button>
-        
-        <button onClick={() => setIsRoadmapOpen(true)} style={{ padding: "10px", cursor: "pointer", marginTop: "10px", width: "100%" }}>
-          View Roadmap
-        </button>
-
-        <h4>Lighting</h4>
-        {/* Lighting controls remain active */}
-        <div className="control-group">
-          <label>
-            <input type="checkbox" checked={castShadows} onChange={(e) => setCastShadows(e.target.checked)} /> Cast Shadows
-          </label>
-        </div>
-        <div className="control-group">
-          <label>Ambient Intensity: {ambientIntensity}</label>
-          <input type="range" min="0" max="2" step="0.1" value={ambientIntensity} onChange={(e) => setAmbientIntensity(parseFloat(e.target.value))} />
-        </div>
-
-        {/* ... (Rest of lighting controls remain same) ... */}
-        <h4>Spot Light</h4>
-        <div className="control-group">
-          <label>Intensity: {spotIntensity}</label>
-          <input type="range" min="0" max="10" step="0.1" value={spotIntensity} onChange={(e) => setSpotIntensity(parseFloat(e.target.value))} />
-        </div>
-        <div className="control-group">
-            <label>Angle: {spotAngle}</label>
-            <input type="range" min="0" max="1.5" step="0.1" value={spotAngle} onChange={(e) => setSpotAngle(parseFloat(e.target.value))} />
-        </div>
-        <div className="control-group">
-            <label>Penumbra: {spotPenumbra}</label>
-            <input type="range" min="0" max="1" step="0.1" value={spotPenumbra} onChange={(e) => setSpotPenumbra(parseFloat(e.target.value))} />
-        </div>
-        <div className="control-group">
-          <label>Pos X: {spotPos[0]}</label>
-          <input type="range" min="-20" max="20" step="1" value={spotPos[0]} onChange={(e) => setSpotPos([parseFloat(e.target.value), spotPos[1], spotPos[2]])} />
-        </div>
-         <div className="control-group">
-          <label>Pos Y: {spotPos[1]}</label>
-          <input type="range" min="0" max="30" step="1" value={spotPos[1]} onChange={(e) => setSpotPos([spotPos[0], parseFloat(e.target.value), spotPos[2]])} />
-        </div>
-        <div className="control-group">
-          <label>Pos Z: {spotPos[2]}</label>
-          <input type="range" min="-20" max="20" step="1" value={spotPos[2]} onChange={(e) => setSpotPos([spotPos[0], spotPos[1], parseFloat(e.target.value)])} />
-        </div>
-        
-        <h4>Directional Light</h4>
-        <div className="control-group">
-          <label>Intensity: {dirIntensity}</label>
-          <input type="range" min="0" max="5" step="0.1" value={dirIntensity} onChange={(e) => setDirIntensity(parseFloat(e.target.value))} />
-        </div>
-        <div className="control-group">
-          <label>Pos X: {dirPos[0]}</label>
-          <input type="range" min="-20" max="20" step="1" value={dirPos[0]} onChange={(e) => setDirPos([parseFloat(e.target.value), dirPos[1], dirPos[2]])} />
-        </div>
-        <div className="control-group">
-          <label>Pos Y: {dirPos[1]}</label>
-          <input type="range" min="0" max="30" step="1" value={dirPos[1]} onChange={(e) => setDirPos([dirPos[0], parseFloat(e.target.value), dirPos[2]])} />
-        </div>
-        <div className="control-group">
-          <label>Pos Z: {dirPos[2]}</label>
-          <input type="range" min="-20" max="20" step="1" value={dirPos[2]} onChange={(e) => setDirPos([dirPos[0], dirPos[1], parseFloat(e.target.value)])} />
-        </div>
-
-      </div>
-      
-      <div className="canvas-container">
-        <Canvas shadows={castShadows} camera={{ position: [5, 5, 10], fov: 50 }}>
-          <ambientLight intensity={ambientIntensity} />
-          <spotLight
-            position={spotPos}
-            angle={spotAngle}
-            penumbra={spotPenumbra}
-            intensity={spotIntensity}
-            castShadow={castShadows}
-            shadow-mapSize={[1024, 1024]}
+        <div className="section">
+          <label>Gravity ({gravity})</label>
+          <input 
+            type="range" min="-20" max="0" step="0.1" 
+            value={gravity} 
+            onChange={(e) => setGravity(parseFloat(e.target.value))} 
           />
-          <directionalLight position={dirPos} intensity={dirIntensity} castShadow={castShadows} />
-          <Suspense fallback={null}>
-            <Simulation gravity={gravity} restitution={restitution} resetTrigger={resetTrigger} />
-          </Suspense>
-          <OrbitControls />
+        </div>
+
+        <div className="section">
+          <label>Bounciness ({restitution})</label>
+          <input 
+            type="range" min="0" max="1.5" step="0.1" 
+            value={restitution} 
+            onChange={(e) => setRestitution(parseFloat(e.target.value))} 
+          />
+        </div>
+
+        <div className="section actions">
+            <button onClick={spawnSphere}>Spawn Sphere ⚪</button>
+            <button onClick={spawnBox}>Spawn Crate 📦</button>
+            <button className="danger" onClick={clearAll}>Clear All 🗑️</button>
+            <button onClick={() => setIsRunning(!isRunning)}>
+                {isRunning ? "Pause ⏸️" : "Resume ▶️"}
+            </button>
+        </div>
+        
+        <div className="stats">
+            Entities: {objects.length}
+        </div>
+      </div>
+
+      <div className="canvas-container">
+        <Canvas shadows camera={{ position: [8, 8, 12], fov: 45 }}>
+            {/* Realistic Lighting Setup */}
+            <ambientLight intensity={0.5} />
+            <spotLight 
+                position={[15, 20, 10]} 
+                angle={0.3} 
+                penumbra={1} 
+                intensity={2} 
+                castShadow 
+                shadow-mapSize={[2048, 2048]}
+            />
+            <Environment preset="sunset" />
+            <OrbitControls />
+          
+            <Suspense fallback={null}>
+                <PhysicsScene 
+                    objects={objects} 
+                    gravity={gravity} 
+                    restitution={restitution}
+                    simulationRunning={isRunning}
+                />
+            </Suspense>
         </Canvas>
       </div>
-
-      {isRoadmapOpen && (
-        <div className="modal-overlay" onClick={() => setIsRoadmapOpen(false)}>
-          <div className={`modal-content ${theme}`} onClick={(e) => e.stopPropagation()}>
-            <button className="close-btn" onClick={() => setIsRoadmapOpen(false)}>
-              &times;
-            </button>
-            <h2>Project Roadmap</h2>
-            <div className="roadmap-list">
-              {roadmapItems.map((item) => (
-                <div key={item.id} className="roadmap-item">
-                  <input
-                    type="checkbox"
-                    checked={item.is_completed}
-                    onChange={() => toggleRoadmapItem(item.id, item.is_completed)}
-                  />
-                  <div>
-                    <strong>{item.todo}</strong>
-                    <p>{item.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

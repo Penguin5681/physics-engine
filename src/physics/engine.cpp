@@ -4,6 +4,9 @@
 #include "core/Vector3.h"
 #include "core/RigidBody.h"
 #include "geometry/Sphere.h"
+#include "core/CollisionDetector.h"
+#include "core/ContactResolver.h"
+#include "geometry/Box.h"
 
 using namespace emscripten;
 
@@ -27,6 +30,31 @@ public:
         bodies.push_back(body);
     }
 
+    void addBox(float x, float y, float z, float w, float h, float d, float mass) {
+        Box* boxShape = new Box(w, h, d);
+        RigidBody* body = new RigidBody(boxShape, x, y, z, mass);
+        body->restitution = 0.5f;
+        bodies.push_back(body);
+    }
+
+    void setGravity(float gy) {
+        gravity.y = gy;
+    }
+
+    void setRestitution(float r) {
+        for (auto body : bodies) {
+            body->restitution = r;
+        }
+    }
+
+    void reset() {
+        for (auto body : bodies) {
+            delete body->shape;
+            delete body;
+        }
+        bodies.clear();
+    }
+
     void step(float dt) {
         for (auto body : bodies) {
             if (body->hasFiniteMass()) {
@@ -34,11 +62,20 @@ public:
             }
 
             body->integrate(dt);
+        }
 
-            // temp coll hacks
-            if (body->position.y < 0.5f) {
-                body->position.y = 0.5f;
-                body->velocity.y *= -body->restitution;
+        for (auto body : bodies) {
+            Contact contact;
+            bool collided = false;
+
+            if (body->shape->type == SPHERE) {
+                collided = CollisionDetector::checkSpherePlane(body, 0.0f, contact);
+            } else if (body->shape->type == BOX) {
+                collided = CollisionDetector::checkBoxPlane(body, 0.0f, contact);
+            }
+
+            if (collided) {
+                ContactResolver::resolve(contact);
             }
         }
     }
@@ -60,7 +97,11 @@ EMSCRIPTEN_BINDINGS(applicable_physics_engine) {
     class_<PhysicsWorld>("PhysicsWorld")
         .constructor<>()
         .function("addSphere", &PhysicsWorld::addSphere)
+        .function("addBox", &PhysicsWorld::addBox)
+        .function("setGravity", &PhysicsWorld::setGravity)
+        .function("setRestitution", &PhysicsWorld::setRestitution)
         .function("step", &PhysicsWorld::step)
+        .function("reset", &PhysicsWorld::reset)
         .function("getBodyCount", &PhysicsWorld::getBodyCount)
         .function("getBodyPosition", &PhysicsWorld::getBodyPosition);
 }
