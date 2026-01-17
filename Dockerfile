@@ -1,6 +1,6 @@
 FROM emscripten/emsdk:latest AS wasm-builder
 WORKDIR /src
-COPY src/physics/engine.cpp ./engine.cpp
+COPY src/physics/ .
 RUN mkdir -p output
 RUN emcc engine.cpp -o output/physics.js \
   -lembind \
