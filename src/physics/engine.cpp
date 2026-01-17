@@ -59,23 +59,46 @@ public:
         for (auto body : bodies) {
             if (body->hasFiniteMass()) {
                 body->velocity += gravity * dt;
+                body->integrate(dt);
             }
-
-            body->integrate(dt);
         }
 
         for (auto body : bodies) {
             Contact contact;
-            bool collided = false;
+            bool hitFloor = false;
 
             if (body->shape->type == SPHERE) {
-                collided = CollisionDetector::checkSpherePlane(body, 0.0f, contact);
+                hitFloor = CollisionDetector::checkSpherePlane(body, 0.0f, contact);
             } else if (body->shape->type == BOX) {
-                collided = CollisionDetector::checkBoxPlane(body, 0.0f, contact);
+                hitFloor = CollisionDetector::checkBoxPlane(body, 0.0f, contact);
             }
 
-            if (collided) {
+            if (hitFloor) {
                 ContactResolver::resolve(contact);
+            }
+        }
+
+        for (size_t i = 0; i < bodies.size(); i++) {
+            for (size_t j = i + 1; j < bodies.size(); j++) {
+                RigidBody* bodyA = bodies[i];
+                RigidBody* bodyB = bodies[j];
+                
+                Contact contact;
+                bool collided = false;
+
+                if (bodyA->shape->type == SPHERE and bodyB->shape->type == SPHERE) {
+                    collided = CollisionDetector::checkSphereSphere(bodyA, bodyB, contact);
+                } else if (bodyA->shape->type == BOX and bodyB->shape->type == BOX) {
+                    collided = CollisionDetector::checkBoxBox(bodyA, bodyB, contact);
+                } else if (bodyA->shape->type == BOX and bodyB->shape->type == SPHERE) {
+                    collided = CollisionDetector::checkBoxSphere(bodyA, bodyB, contact);
+                } else if (bodyA->shape->type == SPHERE and bodyB->shape->type == BOX) {
+                    collided = CollisionDetector::checkSphereBox(bodyA, bodyB, contact);
+                }
+                
+                if (collided) {
+                    ContactResolver::resolve(contact);
+                }
             }
         }
     }

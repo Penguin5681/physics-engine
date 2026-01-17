@@ -5,20 +5,49 @@
 class ContactResolver {
 public:
     static void resolve(Contact& contact) {
-        float separatingVelocity = contact.a->velocity.dot(contact.normal);
+        Vector3 relativeVelocity = contact.a->velocity;
 
-        if (separatingVelocity > 0) {
+        if (contact.b) {
+            relativeVelocity = relativeVelocity - contact.b->velocity;
+        }
+
+        float velocityAlongNormal = relativeVelocity.dot(contact.normal);
+
+        if (velocityAlongNormal > 0) {
             return;
         }
 
-        float newSepVelocity = -separatingVelocity * contact.a->restitution;
-        float deltaVelocity = newSepVelocity - separatingVelocity;
-        float impulse = deltaVelocity / contact.a->inverseMass;
+        float e = contact.a->restitution;
+        if (contact.b) {
+            e = std::min(e, contact.b->restitution);
+        }
 
-        Vector3 impulsePerIMass = contact.normal * impulse;
+        float j = -(1 + e) * velocityAlongNormal;
 
-        contact.a->velocity += impulsePerIMass * contact.a->inverseMass;
+        float inverseMassSum = contact.a->inverseMass;
+        if (contact.b) {
+            inverseMassSum += contact.b->inverseMass;
+        }
 
-        contact.a->position += contact.normal * contact.penetration;
+        j /= inverseMassSum;
+
+        Vector3 impulse = contact.normal * j;
+
+        contact.a->velocity += impulse * contact.a->inverseMass;
+
+        if (contact.b) {
+            contact.b->velocity = contact.b->velocity - impulse * contact.b->inverseMass;
+        }
+
+        const float percent = 0.2f;
+        const float slop = 0.01f;
+        float correctionMag = std::max(contact.penetration - slop, 0.0f) / inverseMassSum * percent;
+
+        Vector3 correction = contact.normal * correctionMag;
+
+        contact.a->position += correction * contact.a->inverseMass;
+        if (contact.b) {
+            contact.b->position = contact.b->position - correction * contact.b->inverseMass;
+        }
     }
 };
