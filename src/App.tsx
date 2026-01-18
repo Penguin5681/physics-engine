@@ -126,6 +126,13 @@ const PhysicsScene = ({
       const mesh = meshRefs.current[i];
       if (bodyData && mesh) {
         mesh.position.set(bodyData.pos.x, bodyData.pos.y, bodyData.pos.z);
+
+        mesh.quaternion.set(
+          bodyData.rot.x,
+          bodyData.rot.y,
+          bodyData.rot.z,
+          bodyData.rot.w,
+        );
       }
     }
   });
