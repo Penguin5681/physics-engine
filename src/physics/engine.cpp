@@ -117,6 +117,12 @@ public:
         return bodies.size(); 
     }
 
+    void setVelocity(int index, float vx, float vy, float vz) {
+         if (index >= 0 and index < bodies.size()) {
+            bodies[index]->velocity = Vector3(vx, vy, vz);
+        }
+    }
+
     void setFriction(float f) {
         for (auto body : bodies) {
             body->friction = f;
@@ -142,6 +148,7 @@ EMSCRIPTEN_BINDINGS(applicable_physics_engine) {
         .function("setRestitution", &PhysicsWorld::setRestitution)
         .function("step", &PhysicsWorld::step)
         .function("setFriction", &PhysicsWorld::setFriction)
+        .function("setVelocity", &PhysicsWorld::setVelocity)
         .function("reset", &PhysicsWorld::reset)
         .function("getBodyCount", &PhysicsWorld::getBodyCount)
         .function("getBodyPosition", &PhysicsWorld::getBodyPosition);
