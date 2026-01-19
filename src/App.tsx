@@ -6,7 +6,8 @@ import "./App.css";
 
 // --- Types ---
 interface Vector3 { x: number; y: number; z: number; }
-interface BodyData { pos: Vector3; }
+interface Quaternion { x: number; y: number; z: number; w: number; }
+interface BodyData { pos: Vector3; rot: Quaternion; }
 
 interface PhysicsWorldInstance {
   addSphere(x: number, y: number, z: number, radius: number, mass: number): void;
@@ -249,10 +250,7 @@ function App() {
 
       {/* Control Sidebar */}
       <div className="sidebar">
-        <div className="sidebar-header">
-            <h2>⚛️ PhysX Engine</h2>
-            <p>Interactive WASM Playground</p>
-        </div>
+        
 
         <div className="control-group">
             <label>Gravity ({gravity.toFixed(1)})</label>
@@ -299,10 +297,10 @@ function App() {
 
         <div className="action-buttons">
             <button className="spawn-btn" onClick={() => spawn('sphere')}>
-                <span>⚪</span> Spawn Sphere
+                Spawn Sphere
             </button>
             <button className="spawn-btn" onClick={() => spawn('box')}>
-                <span>📦</span> Spawn Box
+                Spawn Box
             </button>
             
             <div className="row-btns">

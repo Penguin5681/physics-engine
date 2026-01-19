@@ -1,7 +1,7 @@
 #pragma once
+#include "../geometry/Box.h"
 #include "../geometry/Shape.h"
 #include "../geometry/Sphere.h"
-#include "../geometry/Box.h"
 #include "Matrix3x3.h"
 #include "Quaternion.h"
 #include "Vector3.h"
@@ -32,10 +32,13 @@ public:
         : shape(s), position(x, y, z), angularVelocity(0, 0, 0), velocity(0, 0, 0),
           orientation(1, 0, 0, 0)
     {
-        if (mass > 0.0f) {
+        if (mass > 0.0f)
+        {
             inverseMass = 1.0f / mass;
             calculateInertiaTensor(mass);
-        } else {
+        }
+        else
+        {
             inverseMass = 0.0f;
             inverseInertiaTensor.setIdentity();
             inverseInertiaTensor.data[0] = 0;
@@ -44,41 +47,43 @@ public:
         }
     }
 
-    void calculateInertiaTensor(float mass) {
+    void calculateInertiaTensor(float mass)
+    {
         Matrix3 it;
-        if (shape->type == SPHERE) {
+        if (shape->type == SPHERE)
+        {
             Sphere* s = (Sphere*)shape;
             float coeff = 0.4f * mass * s->radius * s->radius;
-            it.setDialgonal(coeff, coeff, coeff);
-        } else if (shape->type == BOX) {
+            it.setDiagonal(coeff, coeff, coeff);
+        }
+        else if (shape->type == BOX)
+        {
             Box* b = (Box*)shape;
 
             float w = b->halfExtents.x * 2;
             float h = b->halfExtents.y * 2;
             float d = b->halfExtents.z * 2;
-            
-            float ex2 = w*w;
-            float ey2 = h*h;
-            float ez2 = d*d;
+
+            float ex2 = w * w;
+            float ey2 = h * h;
+            float ez2 = d * d;
 
             float factor = mass / 12.0f;
 
-            it.setDialgonal(
-                factor * (ey2 * ez2),
-                factor * (ex2 * ez2),
-                factor * (ey2 * ey2)
-            );
+            it.setDiagonal(factor * (ey2 + ez2), factor * (ex2 + ez2), factor * (ex2 + ey2));
         }
         inverseInertiaTensor.setInverse(it);
     }
 
     bool hasFiniteMass() const { return inverseMass > 0.0f; }
 
-    void integrate(float dt) {
-        if (inverseMass <= 0.0f) return;
+    void integrate(float dt)
+    {
+        if (inverseMass <= 0.0f)
+            return;
 
         position += velocity * dt;
-        
+
         orientation.addScaledVector(angularVelocity, dt);
         orientation.normalize();
 

@@ -21,7 +21,7 @@ public:
         data[8] = 1;
     }
 
-    void setDialgonal(float a, float b, float c)
+    void setDiagonal(float a, float b, float c)
     {
         setIdentity();
         data[0] = a;
