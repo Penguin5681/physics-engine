@@ -58,6 +58,7 @@ public:
     }
 
     void step(float dt) {
+        updateInertiaTensors();
         for (auto body : bodies) {
             if (body->hasFiniteMass()) {
                 body->velocity += gravity * dt;
@@ -119,6 +120,14 @@ public:
     void setFriction(float f) {
         for (auto body : bodies) {
             body->friction = f;
+        }
+    }
+
+    void updateInertiaTensors() {
+        for (auto body : bodies) {
+            if (body->inverseMass  > 0) {
+                body->inverseInertiaTensorWorld = body->inverseInertiaTensor;
+            }
         }
     }
 
