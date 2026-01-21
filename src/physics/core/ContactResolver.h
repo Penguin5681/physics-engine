@@ -48,6 +48,10 @@ public:
         float e = bodyA->restitution;
         if (bodyB)
             e = std::min(e, bodyB->restitution);
+
+        if (velocityAlongNormal > -2.0f) { 
+            e = 0.0f;
+        }
         float jn = -(1 + e) * velocityAlongNormal;
         jn /= totalInverseMass;
 

@@ -159,6 +159,11 @@ hr {
   background: #333;
 }
 
+.spawn-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .row-btns {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -212,4 +217,40 @@ hr {
   color: white;
   z-index: 5;
   pointer-events: none;
+}
+
+.engine-layout {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.toolbar {
+    height: 50px;
+    background: #222;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 15px;
+    color: white;
+    border-bottom: 1px solid #444;
+}
+
+.toolbar button {
+    background: #444;
+    border: none;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.toolbar button:hover { background: #555; }
+
+.divider {
+    width: 1px;
+    height: 30px;
+    background: #555;
+    margin: 0 10px;
 }

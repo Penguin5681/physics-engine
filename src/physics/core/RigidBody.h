@@ -25,6 +25,8 @@ public:
     Matrix3 inverseInertiaTensor;
     Matrix3 inverseInertiaTensorWorld;
 
+    Vector3 forceAccum;
+
     // Shape
     Shape* shape;
 
@@ -77,11 +79,18 @@ public:
 
     bool hasFiniteMass() const { return inverseMass > 0.0f; }
 
+    void addForce(const Vector3& f) { forceAccum += f; }
+
     void integrate(float dt)
     {
         if (inverseMass <= 0.0f)
+        {
             return;
+        }
 
+        Vector3 linearAcc = forceAccum * inverseMass;
+
+        velocity += linearAcc * dt;
         position += velocity * dt;
 
         orientation.addScaledVector(angularVelocity, dt);
@@ -89,6 +98,8 @@ public:
 
         velocity *= std::pow(damping, dt);
         angularVelocity *= std::pow(angularDamping, dt);
+
+        forceAccum = Vector3(0, 0, 0);
     }
 
     emscripten::val toJs() const
