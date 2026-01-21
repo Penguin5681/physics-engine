@@ -60,7 +60,27 @@ public:
     void step(float dt) {
         updateInertiaTensors();
         for (auto body : bodies) {
-            if (body->hasFiniteMass()) {
+            if (!body->hasFiniteMass()) {
+                continue;
+            }
+
+            if (body->isAwake) 
+            {
+                float currentMotion = body->velocity.dot(body->velocity) + 
+                                    body->angularVelocity.dot(body->angularVelocity);
+                
+                float bias = 0.96f; 
+                body->motion = bias * body->motion + (1.0f - bias) * currentMotion;
+
+                if (body->motion < body->sleepEpsilon) {
+                    body->setAwake(false);
+                } 
+                else if (body->motion > 10.0f * body->sleepEpsilon) {
+                    body->motion = 10.0f * body->sleepEpsilon;
+                }
+            }
+
+            if (body->isAwake) {
                 body->velocity += gravity * dt;
                 body->integrate(dt);
             }

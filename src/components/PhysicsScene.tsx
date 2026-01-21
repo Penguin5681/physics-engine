@@ -1,6 +1,6 @@
-import { forwardRef, useImperativeHandle, useRef, useMemo, useEffect, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Sphere, Box, Plane, OrbitControls, useTexture } from "@react-three/drei";
+import { Sphere, Box, Plane, OrbitControls, useTexture, Grid } from "@react-three/drei";
 import * as THREE from "three";
 import { TEXTURES, type PhysicsWorldInstance, type SimulationObject, type TextureType, type ShapeType, type InputMode, type PhysicsModule } from "../types";
 import { GamepadHandler } from "./GamepadHandler";
@@ -43,15 +43,6 @@ export const PhysicsScene = forwardRef<PhysicsSceneRef, PhysicsSceneProps>(({
     const meshRefs = useRef<(THREE.Mesh | null)[]>([]);
     const maps = useTexture(TEXTURES);
     const [orbitEnabled, setOrbitEnabled] = useState(true);
-
-    // Infinite floor texture
-    const rawFloorTexture = useTexture('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/hardwood2_diffuse.jpg');
-    const floorTexture = useMemo(() => {
-        const t = rawFloorTexture.clone();
-        t.wrapS = t.wrapT = THREE.RepeatWrapping;
-        t.repeat.set(500, 500); 
-        return t;
-    }, [rawFloorTexture]);
 
     const performSpawn = (type?: ShapeType) => {
         const shapeType = type || selectedShape;
@@ -172,10 +163,22 @@ export const PhysicsScene = forwardRef<PhysicsSceneRef, PhysicsSceneProps>(({
                 );
             })}
 
-            <Plane args={[1000, 1000]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, -0.01, 0]}>
-                <meshStandardMaterial map={floorTexture} roughness={0.8} />
+            {/* Shadow-receiving infinite floor */}
+            <Plane args={[50000, 50000]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, -0.01, 0]}>
+                <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
             </Plane>
-            <gridHelper args={[1000, 500, 0x555555, 0x333333]} rotation={[-Math.PI/2, 0, 0]} position={[0, 0.02, 0]} />
+            
+            {/* Infinite Grid using drei component */}
+            <Grid 
+                position={[0, 0.01, 0]} 
+                args={[100, 100]} 
+                cellSize={1} 
+                sectionSize={5} 
+                infiniteGrid 
+                fadeDistance={100} 
+                sectionColor="#555555" 
+                cellColor="#333333" 
+            />
         </>
     );
 });
