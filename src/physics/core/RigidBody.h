@@ -27,12 +27,16 @@ public:
 
     Vector3 forceAccum;
 
+    bool isAwake;
+    float motion;
+    float sleepEpsilon = 0.3f;
+
     // Shape
     Shape* shape;
 
     RigidBody(Shape* s, float x, float y, float z, float mass)
         : shape(s), position(x, y, z), angularVelocity(0, 0, 0), velocity(0, 0, 0),
-          orientation(1, 0, 0, 0)
+          orientation(1, 0, 0, 0), isAwake(true), motion(2.0f * 0.3f)
     {
         if (mass > 0.0f)
         {
@@ -43,9 +47,22 @@ public:
         {
             inverseMass = 0.0f;
             inverseInertiaTensor.setIdentity();
-            inverseInertiaTensor.data[0] = 0;
-            inverseInertiaTensor.data[4] = 0;
-            inverseInertiaTensor.data[8] = 0;
+            isAwake = false;
+        }
+    }
+
+    void setAwake(bool awake = true)
+    {
+        if (awake)
+        {
+            isAwake = true;
+            motion = 2.0f * sleepEpsilon;
+        }
+        else
+        {
+            isAwake = false;
+            velocity = Vector3(0, 0, 0);
+            angularVelocity = Vector3(0, 0, 0);
         }
     }
 
@@ -79,11 +96,15 @@ public:
 
     bool hasFiniteMass() const { return inverseMass > 0.0f; }
 
-    void addForce(const Vector3& f) { forceAccum += f; }
+    void addForce(const Vector3& f)
+    {
+        forceAccum += f;
+        setAwake(true);
+    }
 
     void integrate(float dt)
     {
-        if (inverseMass <= 0.0f)
+        if (!isAwake or inverseMass <= 0.0f)
         {
             return;
         }
@@ -113,6 +134,7 @@ public:
         rot.set("y", orientation.y);
         rot.set("z", orientation.z);
         obj.set("rot", rot);
+        obj.set("isAwake", isAwake);
 
         return obj;
     }

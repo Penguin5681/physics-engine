@@ -11,6 +11,17 @@ public:
         RigidBody* bodyA = contact.a;
         RigidBody* bodyB = contact.b;
 
+        if (!bodyA->isAwake && (!bodyB || !bodyB->isAwake)) {
+            return;
+        }
+
+        if (bodyA->hasFiniteMass() && !bodyA->isAwake) {
+            bodyA->setAwake(true);
+        }
+        if (bodyB && bodyB->hasFiniteMass() && !bodyB->isAwake) {
+            bodyB->setAwake(true);
+        }
+
         Vector3 rA = contact.point - bodyA->position;
         Vector3 rB = bodyB ? (contact.point - bodyB->position) : Vector3(0, 0, 0);
 

@@ -55,7 +55,6 @@ function App() {
       <div className="viewport">
           <Canvas shadows camera={{ position: [8, 5, 8], fov: 50 }}>
             <color attach="background" args={['#202020']} /> 
-            <fog attach="fog" args={['#202020', 10, 50]} /> 
             
             <ambientLight intensity={0.5} />
             <spotLight position={[10, 20, 10]} angle={0.3} penumbra={1} castShadow shadow-mapSize={[2048, 2048]} />
