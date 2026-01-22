@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Sphere, Box, Plane, OrbitControls, useTexture, Grid } from "@react-three/drei";
+import { Sphere, Box, Cylinder, Plane, OrbitControls, useTexture, Grid } from "@react-three/drei";
 import * as THREE from "three";
 import { TEXTURES, type PhysicsWorldInstance, type SimulationObject, type TextureType, type ShapeType, type InputMode, type PhysicsModule } from "../types";
 import { GamepadHandler } from "./GamepadHandler";
@@ -54,9 +54,10 @@ export const PhysicsScene = forwardRef<PhysicsSceneRef, PhysicsSceneProps>(({
         spawnPos.multiplyScalar(spawnDist);
         spawnPos.add(camera.position);
 
-        const newObj: SimulationObject = shapeType === 'sphere' 
-            ? { id: Date.now(), type: 'sphere', size: [0.6], textureId: selectedTexture }
-            : { id: Date.now(), type: 'box', size: [1, 1, 1], textureId: selectedTexture };
+        const newObj: SimulationObject = 
+          shapeType === 'sphere' ? { id: Date.now(), type: 'sphere', size: [0.6], textureId: selectedTexture } :
+          shapeType === 'cylinder' ? { id: Date.now(), type: 'cylinder', size: [0.5, 1.0], textureId: selectedTexture } :
+          { id: Date.now(), type: 'box', size: [1, 1, 1], textureId: selectedTexture };
         
         setObjects(prev => [...prev, { ...newObj, initialPos: [spawnPos.x, spawnPos.y, spawnPos.z] }]);
     };
@@ -97,8 +98,16 @@ export const PhysicsScene = forwardRef<PhysicsSceneRef, PhysicsSceneProps>(({
                 z = (Math.random() - 0.5) * 5;
                 y = 8 + (i * 2);
             }
-            if (obj.type === 'sphere') world.addSphere(x, y, z, obj.size[0], 1.0);
-            else {
+
+            if (obj.type === 'cylinder') {
+                // cylinder size is [radius, height]
+                // Ensure addCylinder is exposed in C++ bindings and TypeScript interface
+                if (world.addCylinder) { 
+                    world.addCylinder(x, y, z, obj.size[0], obj.size[1] ?? 1.0, 1.0);
+                }
+            } else if (obj.type === 'sphere') {
+                world.addSphere(x, y, z, obj.size[0], 1.0);
+            } else {
                 // box size array is [w, h, d]
                 const w = obj.size[0];
                 const h = obj.size[1] ?? 1;
@@ -152,15 +161,26 @@ export const PhysicsScene = forwardRef<PhysicsSceneRef, PhysicsSceneProps>(({
 
             {objects.map((obj, i) => {
                 const textureMap = maps[obj.textureId];
-                return obj.type === 'sphere' ? (
-                    <Sphere key={obj.id} ref={el => {meshRefs.current[i]=el}} args={[obj.size[0], 32, 32]} castShadow userData={{ physicsId: i }}>
-                        <meshStandardMaterial map={textureMap} wireframe={debugMode} />
-                    </Sphere>
-                ) : (
-                    <Box key={obj.id} ref={el => {meshRefs.current[i]=el}} args={obj.size.length === 3 ? [obj.size[0], obj.size[1]!, obj.size[2]!] : [1, 1, 1]} castShadow userData={{ physicsId: i }}>
-                        <meshStandardMaterial map={textureMap} wireframe={debugMode} />
-                    </Box>
-                );
+                if (obj.type === 'sphere') {
+                    return (
+                        <Sphere key={obj.id} ref={el => {meshRefs.current[i]=el}} args={[obj.size[0], 32, 32]} castShadow userData={{ physicsId: i }}>
+                            <meshStandardMaterial map={textureMap} wireframe={debugMode} />
+                        </Sphere>
+                    );
+                } else if (obj.type === 'cylinder') {
+                    // ThreeJS Cylinder args: [radiusTop, radiusBottom, height, radialSegments]
+                    return (
+                        <Cylinder key={obj.id} ref={el => {meshRefs.current[i]=el}} args={[obj.size[0], obj.size[0], obj.size[1] ?? 1.0, 32]} castShadow userData={{ physicsId: i }}>
+                             <meshStandardMaterial map={textureMap} wireframe={debugMode} />
+                        </Cylinder>
+                    );
+                } else {
+                    return (
+                        <Box key={obj.id} ref={el => {meshRefs.current[i]=el}} args={obj.size.length === 3 ? [obj.size[0], obj.size[1]!, obj.size[2]!] : [1, 1, 1]} castShadow userData={{ physicsId: i }}>
+                            <meshStandardMaterial map={textureMap} wireframe={debugMode} />
+                        </Box>
+                    );
+                }
             })}
 
             {/* Shadow-receiving infinite floor */}

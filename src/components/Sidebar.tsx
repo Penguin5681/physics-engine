@@ -76,6 +76,7 @@ export const Sidebar = ({
         <div className="action-buttons">
             <button className={`spawn-btn ${selectedShape === 'box' ? 'active' : ''}`} onClick={() => { setSelectedShape('box'); onSpawn('box'); }}>+ Box</button>
             <button className={`spawn-btn ${selectedShape === 'sphere' ? 'active' : ''}`} onClick={() => { setSelectedShape('sphere'); onSpawn('sphere'); }}>+ Sphere</button>
+            <button className={`spawn-btn ${selectedShape === 'cylinder' ? 'active' : ''}`} onClick={() => { setSelectedShape('cylinder'); onSpawn('cylinder'); }}>+ Cylinder</button>
             <button className="clear-btn" onClick={onClear}>Clear All</button>
         </div>
       </div>

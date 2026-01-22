@@ -94,6 +94,8 @@ public:
                 hitFloor = CollisionDetector::checkSpherePlane(body, 0.0f, contact);
             } else if (body->shape->type == BOX) {
                 hitFloor = CollisionDetector::checkBoxPlane(body, 0.0f, contact);
+            } else if (body->shape->type == CYLINDER) {
+                hitFloor = CollisionDetector::checkCylinderPlane(body, 0.0f, contact);
             }
 
             if (hitFloor) {
@@ -117,6 +119,14 @@ public:
                     collided = CollisionDetector::checkBoxSphere(bodyA, bodyB, contact);
                 } else if (bodyA->shape->type == SPHERE and bodyB->shape->type == BOX) {
                     collided = CollisionDetector::checkSphereBox(bodyA, bodyB, contact);
+                } else if (bodyA->shape->type == SPHERE and bodyB->shape->type == CYLINDER) {
+                    collided = CollisionDetector::checkSphereCylinder(bodyA, bodyB, contact);
+                } else if (bodyA->shape->type == CYLINDER and bodyB->shape->type == SPHERE) {
+                    collided = CollisionDetector::checkSphereCylinder(bodyA, bodyB, contact);
+                    if (collided)
+                    {
+                        contact.normal = contact.normal * -1.0f;
+                    }
                 }
 
                 if (collided) {
@@ -163,6 +173,15 @@ public:
         }
     }
 
+    void addCylinder(float x, float y, float z, float radius, float height, float mass) 
+    {
+        Cylinder* cylinder = new Cylinder(radius, height);
+        RigidBody* body = new RigidBody(cylinder, x, y, z, mass);
+        body->friction = 0.5f;
+        body->restitution = 0.5f;
+        bodies.push_back(body);
+    }
+
 };
 
 EMSCRIPTEN_BINDINGS(applicable_physics_engine) {
@@ -170,6 +189,7 @@ EMSCRIPTEN_BINDINGS(applicable_physics_engine) {
         .constructor<>()
         .function("addSphere", &PhysicsWorld::addSphere)
         .function("addBox", &PhysicsWorld::addBox)
+        .function("addCylinder", &PhysicsWorld::addCylinder)
         .function("setGravity", &PhysicsWorld::setGravity)
         .function("setRestitution", &PhysicsWorld::setRestitution)
         .function("step", &PhysicsWorld::step)

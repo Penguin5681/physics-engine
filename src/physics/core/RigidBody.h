@@ -2,6 +2,7 @@
 #include "../geometry/Box.h"
 #include "../geometry/Shape.h"
 #include "../geometry/Sphere.h"
+#include "../geometry/Cylinder.h"
 #include "Matrix3x3.h"
 #include "Quaternion.h"
 #include "Vector3.h"
@@ -90,6 +91,20 @@ public:
             float factor = mass / 12.0f;
 
             it.setDiagonal(factor * (ey2 + ez2), factor * (ex2 + ez2), factor * (ex2 + ey2));
+        }
+        else if (shape->type == CYLINDER)
+        {
+            Cylinder *c = (Cylinder*)shape;
+            float r = c->radius;
+            float h = c->halfHeight * 2.0f;
+
+            float r2 = r * r;
+            float h2 = h * h;
+
+            float iy = 0.5f * mass * r2;
+            float ixz = (1.0f / 12.0f) * mass * (3 * r2 + h2);
+
+            it.setDiagonal(ixz, iy, ixz);
         }
         inverseInertiaTensor.setInverse(it);
     }

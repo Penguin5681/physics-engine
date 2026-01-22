@@ -45,7 +45,7 @@ function App() {
   };
   
   const toggleShape = () => {
-      setSelectedShape(prev => prev === 'box' ? 'sphere' : 'box');
+      setSelectedShape(prev => prev === 'box' ? 'sphere' : prev === 'sphere' ? 'cylinder' : 'box');
   };
 
   if (!ready) return <div className="loader">Loading Engine...</div>;

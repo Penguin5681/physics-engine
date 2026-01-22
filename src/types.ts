@@ -4,6 +4,7 @@ export interface BodyData { pos: Vector3; rot: { w: number, x: number, y: number
 export interface PhysicsWorldInstance {
   addSphere(x: number, y: number, z: number, radius: number, mass: number): void;
   addBox(x: number, y: number, z: number, w: number, h: number, d: number, mass: number): void;
+  addCylinder(x: number, y: number, z: number, radius: number, height: number, mass: number): void;
   step(dt: number): void;
   getBodyPosition(index: number): BodyData | null;
   getBodyCount(): number;
@@ -30,7 +31,7 @@ export interface SimulationObject {
   initialPos?: [number, number, number];
 }
 
-export type ShapeType = 'sphere' | 'box';
+export type ShapeType = 'sphere' | 'box' | 'cylinder';
 export type InputMode = 'keyboard' | 'controller';
 
 export const TEXTURES: Record<TextureType, string> = {

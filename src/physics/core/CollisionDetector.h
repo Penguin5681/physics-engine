@@ -29,7 +29,7 @@ public:
     static bool checkBoxPlane(RigidBody* boxBody, float planeY, Contact& contact)
     {
         Box* box = (Box*)boxBody->shape;
-        
+
         Vector3 corners[8] = {
             Vector3(box->halfExtents.x, box->halfExtents.y, box->halfExtents.z),
             Vector3(-box->halfExtents.x, box->halfExtents.y, box->halfExtents.z),
@@ -38,21 +38,21 @@ public:
             Vector3(box->halfExtents.x, box->halfExtents.y, -box->halfExtents.z),
             Vector3(-box->halfExtents.x, box->halfExtents.y, -box->halfExtents.z),
             Vector3(box->halfExtents.x, -box->halfExtents.y, -box->halfExtents.z),
-            Vector3(-box->halfExtents.x, -box->halfExtents.y, -box->halfExtents.z)
-        };
+            Vector3(-box->halfExtents.x, -box->halfExtents.y, -box->halfExtents.z)};
 
         float lowestY = 100000.0f;
         Vector3 lowestPoint;
 
-        for(int i=0; i<8; i++) {
+        for (int i = 0; i < 8; i++)
+        {
             Quaternion q = boxBody->orientation;
             Vector3 v = corners[i];
-            
+
             float x = q.x, y = q.y, z = q.z, w = q.w;
-            float x2 = x+x, y2 = y+y, z2 = z+z;
-            float xx = x*x2, xy = x*y2, xz = x*z2;
-            float yy = y*y2, yz = y*z2, zz = z*z2;
-            float wx = w*x2, wy = w*y2, wz = w*z2;
+            float x2 = x + x, y2 = y + y, z2 = z + z;
+            float xx = x * x2, xy = x * y2, xz = x * z2;
+            float yy = y * y2, yz = y * z2, zz = z * z2;
+            float wx = w * x2, wy = w * y2, wz = w * z2;
 
             Vector3 rotated;
             rotated.x = (1.0f - (yy + zz)) * v.x + (xy - wz) * v.y + (xz + wy) * v.z;
@@ -61,7 +61,8 @@ public:
 
             Vector3 worldPos = boxBody->position + rotated;
 
-            if (worldPos.y < lowestY) {
+            if (worldPos.y < lowestY)
+            {
                 lowestY = worldPos.y;
                 lowestPoint = worldPos;
             }
@@ -73,7 +74,7 @@ public:
             contact.b = nullptr;
             contact.normal = Vector3(0, 1, 0);
             contact.penetration = planeY - lowestY;
-            contact.point = lowestPoint; 
+            contact.point = lowestPoint;
             return true;
         }
         return false;
@@ -193,5 +194,95 @@ public:
             contact.normal = contact.normal * -1.0f;
         }
         return result;
+    }
+
+    static bool checkCylinderPlane(RigidBody* cylBody, float planeY, Contact& contact)
+    {
+        Cylinder* cylinder = (Cylinder*)cylBody->shape;
+
+        std::vector<Vector3> rimPoints;
+        float angleStep = (3.14159f * 2.0f) / 8.0f;
+
+        for (int i = 0; i < 8; i++)
+        {
+            float theta = i * angleStep;
+            float x = cylinder->radius * std::cos(theta);
+            float z = cylinder->radius * std::sin(theta);
+
+            rimPoints.push_back(Vector3(x, -cylinder->halfHeight, z));
+            rimPoints.push_back(Vector3(x, cylinder->halfHeight, z));
+        }
+
+        float lowestY = 100000.0f;
+        Vector3 lowestPoint;
+        bool collided = false;
+
+        for (const auto& p : rimPoints)
+        {
+            Vector3 worldPt = cylBody->orientation.rotate(p);
+            worldPt += cylBody->position;
+
+            if (worldPt.y < lowestY)
+            {
+                lowestY = worldPt.y;
+                lowestPoint = worldPt;
+            }
+        }
+
+        if (lowestY < planeY)
+        {
+            contact.a = cylBody;
+            contact.b = nullptr;
+            contact.normal = Vector3(0, 1, 0);
+            contact.penetration = planeY - lowestY;
+            contact.point = lowestPoint;
+            return true;
+        }
+        return false;
+    }
+
+    static bool checkSphereCylinder(RigidBody* sphereBody, RigidBody* cylBody, Contact& contact)
+    {
+        Sphere* sphere = (Sphere*)sphereBody->shape;
+        Cylinder* cylinder = (Cylinder*)cylBody->shape;
+
+        Vector3 sphereWorld = sphereBody->position;
+        Vector3 relPos = sphereWorld - cylBody->position;
+
+        Quaternion invOr = cylBody->orientation;
+        invOr.invert();
+        Vector3 localPos = invOr.rotate(relPos);
+
+        float closestY = std::max(-cylinder->halfHeight, std::min(localPos.y, cylinder->halfHeight));
+
+        Vector3 xzVec(localPos.x, 0, localPos.z);
+        float distXZ = xzVec.magnitude();
+
+        Vector3 closestXZ;
+        if (distXZ > 0) 
+        {
+            float clampedDist = std::min(distXZ, cylinder->radius);
+            closestXZ = xzVec * (clampedDist / distXZ);
+        } 
+        else 
+        {
+            closestXZ = Vector3(0, 0, 0);
+        }
+
+        Vector3 localClosest = Vector3(closestXZ.x, closestY, closestXZ.z);
+        Vector3 worldClosest = cylBody->orientation.rotate(localClosest) + cylBody->position;
+
+        Vector3 distVec = sphereWorld - worldClosest;
+        float dist = distVec.magnitude();
+
+        if (dist < sphere->radius and dist > 0)
+        {
+            contact.a = sphereBody;
+            contact.b = cylBody;
+            contact.normal = distVec * (1.0f / dist);
+            contact.point = worldClosest;
+            return true;
+        }
+        return false;
     }
 };

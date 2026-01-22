@@ -3,7 +3,8 @@
 enum ShapeType {
     SPHERE,
     BOX,
-    PLANE
+    PLANE,
+    CYLINDER
 };
 
 class Shape {

@@ -25,19 +25,28 @@ public:
         z *= d;
     }
 
-    Vector3 rotate(const Vector3& v) const {
+    Vector3 rotate(const Vector3& v) const
+    {
         Vector3 qv(x, y, z);
         Vector3 t = qv.cross(v) * 2.0f;
         return v + (t * w) + qv.cross(t);
     }
 
-    void addScaledVector(const Vector3& v, float scale) {
-      Quaternion q(0, v.x * scale, v.y * scale, v.z * scale);
-      q = q * (*this);
-      w += q.w * 0.5f;
-      x += q.x * 0.5f;
-      y += q.y * 0.5f;
-      z += q.z * 0.5f;
+    void invert()
+    {
+        x = -x;
+        y = -y;
+        z = -z;
+    }
+
+    void addScaledVector(const Vector3& v, float scale)
+    {
+        Quaternion q(0, v.x * scale, v.y * scale, v.z * scale);
+        q = q * (*this);
+        w += q.w * 0.5f;
+        x += q.x * 0.5f;
+        y += q.y * 0.5f;
+        z += q.z * 0.5f;
     }
 
     Quaternion operator*(const Quaternion& q) const

@@ -94,4 +94,10 @@ public:
         result.data[8] = data[8];
         return result;
     }
+
+    void invert()
+    {
+        Matrix3 t = *this;
+        setInverse(t);
+    }
 };
