@@ -129,7 +129,7 @@ public:
             }
         }
 
-        const float percent = 0.8f;
+        const float percent = 0.2f;
         const float slop = 0.01f;
 
         float linearInvMassSum = bodyA->inverseMass;

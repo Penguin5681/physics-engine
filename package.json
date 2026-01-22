@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prod:once": "cd src/physics && ./build.sh && cd ../../ && npm i && npm run build && npm run preview"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
