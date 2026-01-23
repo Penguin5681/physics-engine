@@ -102,7 +102,7 @@ public:
             float h2 = h * h;
 
             float iy = 0.5f * mass * r2;
-            float ixz = (1.0f / 12.0f) * mass * (3 * r2 + h2);
+            float ixz = (1.0f / 12.0f) * mass * (3.0f * r2 + h2);
 
             it.setDiagonal(ixz, iy, ixz);
         }

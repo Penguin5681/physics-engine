@@ -1,11 +1,25 @@
 #pragma once
 #include "../geometry/Box.h"
+#include "../geometry/Cylinder.h"
 #include "../geometry/Sphere.h"
 #include "Contact.h"
 
 class CollisionDetector
 {
 public:
+    static Vector3 toLocal(RigidBody* body, const Vector3& worldPt)
+    {
+        Vector3 rel = worldPt - body->position;
+        Quaternion invQ = body->orientation;
+        invQ.invert();
+        return invQ.rotate(rel);
+    }
+
+    static Vector3 toWorld(RigidBody* body, const Vector3& localPt)
+    {
+        return body->position + body->orientation.rotate(localPt);
+    }
+
     static bool checkSpherePlane(RigidBody* sphereBody, float planeY, Contact& contact)
     {
         Sphere* sphere = (Sphere*)sphereBody->shape;
@@ -241,46 +255,220 @@ public:
         return false;
     }
 
+
+    static Vector3 radiusAtAngle(float angle, float radius)
+    {
+        return Vector3(std::cos(angle) * radius, 0, std::sin(angle) * radius);
+    }
+
+    static void generateCylinderPoints(Cylinder* cylinder, std::vector<Vector3>& outPoints)
+    {
+        int segments = 0;
+        float step = 6.28318f / segments;
+        for (int i = 0; i < segments; i++)
+        {
+            float angle = i * step;
+            float x = std::cos(angle) * cylinder->radius;
+            float z = std::sin(angle) * cylinder->radius;
+
+            outPoints.push_back(Vector3(x, cylinder->halfHeight, z));
+            outPoints.push_back(Vector3(x, -cylinder->halfHeight, z));
+        }
+    }
+
     static bool checkSphereCylinder(RigidBody* sphereBody, RigidBody* cylBody, Contact& contact)
     {
         Sphere* sphere = (Sphere*)sphereBody->shape;
         Cylinder* cylinder = (Cylinder*)cylBody->shape;
 
-        Vector3 sphereWorld = sphereBody->position;
-        Vector3 relPos = sphereWorld - cylBody->position;
+        Vector3 localSphere = toLocal(cylBody, sphereBody->position);
+        float clampedY =
+            std::max(-cylinder->halfHeight, std::min(localSphere.y, cylinder->halfHeight));
 
-        Quaternion invOr = cylBody->orientation;
-        invOr.invert();
-        Vector3 localPos = invOr.rotate(relPos);
-
-        float closestY = std::max(-cylinder->halfHeight, std::min(localPos.y, cylinder->halfHeight));
-
-        Vector3 xzVec(localPos.x, 0, localPos.z);
+        Vector3 closestLocal;
+        Vector3 xzVec(localSphere.x, 0, localSphere.z);
         float distXZ = xzVec.magnitude();
 
-        Vector3 closestXZ;
-        if (distXZ > 0) 
+        if (distXZ > 0.0001f)
         {
-            float clampedDist = std::min(distXZ, cylinder->radius);
-            closestXZ = xzVec * (clampedDist / distXZ);
-        } 
-        else 
+            float clamedR = std::min(distXZ, cylinder->radius);
+
+            if (distXZ < cylinder->radius and std::abs(localSphere.y) < cylinder->halfHeight)
+            {
+                float distToSide = cylinder->radius - distXZ;
+                float distToTop = cylinder->halfHeight - localSphere.y;
+                float distToBottom = localSphere.y - (-cylinder->halfHeight);
+
+                if (distToSide < distToTop and distToSide < distToBottom)
+                {
+                    closestLocal = xzVec * (cylinder->radius / distXZ);
+                    closestLocal.y = localSphere.y;
+                }
+                else if (distToTop < distToBottom)
+                {
+                    closestLocal = Vector3(localSphere.x, cylinder->halfHeight, localSphere.z);
+                }
+                else
+                {
+                    closestLocal = Vector3(localSphere.x, -cylinder->halfHeight, localSphere.z);
+                }
+            }
+            else
+            {
+                float r = cylinder->radius;
+                Vector3 edge = xzVec * (r / distXZ);
+                closestLocal = Vector3(edge.x, clampedY, edge.z);
+
+                if (distXZ < cylinder->radius)
+                {
+                    closestLocal.x = localSphere.x;
+                    closestLocal.z = localSphere.z;
+                }
+            }
+        }
+        else
         {
-            closestXZ = Vector3(0, 0, 0);
+            closestLocal = Vector3(radiusAtAngle(0, cylinder->radius).x, clampedY,
+                                   radiusAtAngle(0, cylinder->radius).z);
         }
 
-        Vector3 localClosest = Vector3(closestXZ.x, closestY, closestXZ.z);
-        Vector3 worldClosest = cylBody->orientation.rotate(localClosest) + cylBody->position;
+        // NOTE: This is almost correct, will make it more accurate in the future, peace!
+        Vector3 worldClosest = toWorld(cylBody, closestLocal);
 
-        Vector3 distVec = sphereWorld - worldClosest;
-        float dist = distVec.magnitude();
+        Vector3 diff = sphereBody->position - worldClosest;
+        float dist = diff.magnitude();
 
-        if (dist < sphere->radius and dist > 0)
+        if (dist < sphere->radius)
         {
             contact.a = sphereBody;
             contact.b = cylBody;
-            contact.normal = distVec * (1.0f / dist);
+            contact.penetration = sphere->radius - dist;
+            contact.normal = (dist > 0) ? diff * (1.0f / dist) : Vector3(0, 1, 0);
             contact.point = worldClosest;
+            return true;
+        }
+        return false;
+    }
+
+    static bool checkCylinderBox(RigidBody* cylBody, RigidBody* boxBody, Contact& contact)
+    {
+        Cylinder* cylinder = (Cylinder*)cylBody->shape;
+        Box* box = (Box*)boxBody->shape;
+
+        float deepestPenetration = -1000.0f;
+        Vector3 collisionPoint;
+        Vector3 collisionNormal;
+        bool hit = false;
+
+        std::vector<Vector3> cylPoints;
+        generateCylinderPoints(cylinder, cylPoints);
+
+        for (const auto& localPt : cylPoints)
+        {
+            Vector3 worldPt = toWorld(cylBody, localPt);
+            Vector3 boxLocal = toLocal(boxBody, worldPt);
+
+            if (std::abs(boxLocal.x) < box->halfExtents.x and
+                std::abs(boxLocal.y) < box->halfExtents.y and
+                std::abs(boxLocal.z) < box->halfExtents.z)
+            {
+                float dx = box->halfExtents.x - std::abs(boxLocal.x);
+                float dy = box->halfExtents.y - std::abs(boxLocal.y);
+                float dz = box->halfExtents.z - std::abs(boxLocal.z);
+
+                float pen = std::min(dx, std::min(dy, dz));
+                if (pen > deepestPenetration)
+                {
+                    deepestPenetration = pen;
+                    collisionPoint = worldPt;
+
+                    Vector3 localNormal;
+                    if (pen == dx)
+                    {
+                        localNormal = Vector3((boxLocal.x > 0) ? 1 : -1, 0, 0);
+                    }
+                    else if (pen == dy)
+                    {
+                        localNormal = Vector3(0, (boxLocal.y > 0) ? 1 : -1, 0);
+                    }
+                    else
+                    {
+                        localNormal = Vector3(0, 0, (boxLocal.z > 0) ? 1 : -1);
+                    }
+
+                    collisionNormal = boxBody->orientation.rotate(localNormal);
+                    hit = true;
+                }
+            }
+        }
+
+        if (hit)
+        {
+            contact.a = cylBody;
+            contact.b = boxBody;
+            contact.penetration = deepestPenetration;
+            contact.normal = collisionNormal * -1.0f;
+            contact.point = collisionPoint;
+            return true;
+        }
+        return false;
+    }
+
+    static bool checkCylinderCylinder(RigidBody* a, RigidBody* b, Contact& contact)
+    {
+        Cylinder* cylA = (Cylinder*)a->shape;
+        Cylinder* cylB = (Cylinder*)b->shape;
+
+        float deepestPenetration = -1000.0f;
+        Vector3 collisionPoint;
+        Vector3 collisionNormal;
+        bool hit = false;
+
+        std::vector<Vector3> ptsA;
+        generateCylinderPoints(cylA, ptsA);
+        for (auto& lp : ptsA)
+        {
+            Vector3 wp = toWorld(a, lp);
+            Vector3 localB = toLocal(b, wp);
+
+            if (std::abs(localB.y) < cylB->halfHeight)
+            {
+                float distSq = localB.x * localB.x + localB.z * localB.z;
+                if (distSq < cylB->radius * cylB->radius)
+                {
+                    float dist = std::sqrt(distSq);
+                    float penR = cylB->radius - dist;
+                    float penY = cylB->halfHeight - std::abs(localB.y);
+
+                    float pen = std::min(penR, penY);
+                    if (pen > deepestPenetration)
+                    {
+                        deepestPenetration = pen;
+                        collisionPoint = wp;
+
+                        if (pen == penY)
+                        {
+                            Vector3 ln = Vector3(0, (localB.y > 0) ? 1 : -1, 0);
+                            collisionNormal = b->orientation.rotate(ln);
+                        }
+                        else
+                        {
+                            Vector3 ln = Vector3(localB.x, 0, localB.z) * (1.0f / dist);
+                            collisionNormal = b->orientation.rotate(ln);
+                        }
+                        hit = true;
+                    }
+                }
+            }
+        }
+
+        if (hit)
+        {
+            contact.a = a;
+            contact.b = b;
+            contact.penetration = deepestPenetration;
+            contact.normal = collisionNormal * -1.0f;
+            contact.point = collisionPoint;
             return true;
         }
         return false;

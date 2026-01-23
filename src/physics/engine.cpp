@@ -122,11 +122,21 @@ public:
                 } else if (bodyA->shape->type == SPHERE and bodyB->shape->type == CYLINDER) {
                     collided = CollisionDetector::checkSphereCylinder(bodyA, bodyB, contact);
                 } else if (bodyA->shape->type == CYLINDER and bodyB->shape->type == SPHERE) {
-                    collided = CollisionDetector::checkSphereCylinder(bodyA, bodyB, contact);
+                    collided = CollisionDetector::checkSphereCylinder(bodyB, bodyA, contact);
                     if (collided)
                     {
                         contact.normal = contact.normal * -1.0f;
                     }
+                } else if (bodyA->shape->type == CYLINDER and bodyB->shape->type == BOX) {
+                    collided = CollisionDetector::checkCylinderBox(bodyA, bodyB, contact);
+                } else if (bodyA->shape->type == BOX and bodyB->shape->type == CYLINDER) {
+                    collided = CollisionDetector::checkCylinderBox(bodyB, bodyA, contact);
+                    if (collided)
+                    {
+                        contact.normal = contact.normal * -1.0f;
+                    }
+                } else if (bodyA->shape->type == CYLINDER and bodyB->shape->type == CYLINDER) {
+                    collided = CollisionDetector::checkCylinderCylinder(bodyA, bodyB, contact);
                 }
 
                 if (collided) {
